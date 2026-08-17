@@ -3,11 +3,14 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
 } from "@nestjs/common";
 import { QuotesService } from "./quotes.service.js";
 import { CreateQuoteDto } from "./dto/create-quote.dto.js";
 import { CreateQuoteItemDto } from "./dto/create-quote-item.dto.js";
+import { UpdateQuoteStatusDto } from "./dto/update-quote-status.dto.js";
+import { UpdateQuoteDiscountDto } from "./dto/update-quote-discount.dto.js";
 
 @Controller("quotes")
 export class QuotesController {
@@ -19,10 +22,22 @@ export class QuotesController {
   create(@Body() dto: CreateQuoteDto) {
     return this.quotesService.create(dto);
   }
+  @Get()
+  findAll() {
+    return this.quotesService.findAll();
+  }
 
   @Get(":id")
   findOne(@Param("id") id: string) {
     return this.quotesService.findOne(id);
+  }
+
+  @Patch(":id/status")
+  updateStatus(
+    @Param("id") id: string,
+    @Body() dto: UpdateQuoteStatusDto,
+  ) {
+    return this.quotesService.updateStatus(id, dto.status);
   }
 
   @Post(":id/items")
@@ -31,5 +46,16 @@ export class QuotesController {
     @Body() dto: CreateQuoteItemDto,
   ) {
     return this.quotesService.addItem(id, dto);
+  }
+
+  @Patch(":id/discount")
+  updateDiscount(
+    @Param("id") id: string,
+    @Body() dto: UpdateQuoteDiscountDto,
+  ) {
+    return this.quotesService.updateDiscount(
+      id,
+      dto.discount,
+    );
   }
 }

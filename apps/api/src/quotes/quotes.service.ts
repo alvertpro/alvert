@@ -1,10 +1,12 @@
 import {
+  BadRequestException,  
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service.js";
 import { CreateQuoteDto } from "./dto/create-quote.dto.js";
 import { CreateQuoteItemDto } from "./dto/create-quote-item.dto.js";
+import type { QuoteStatus } from "../generated/enums.js";
 
 @Injectable()
 export class QuotesService {
@@ -69,6 +71,78 @@ export class QuotesService {
     }
 
     return quote;
+  }
+
+  async findAll() {
+    return this.prisma.quote.findMany({
+      include: {
+        company: true,
+        customer: true,
+        items: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+  }
+
+  async updateStatus(id: string, status: QuoteStatus) {
+    const quote = await this.prisma.quote.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException("Quote not found");
+    }
+
+    return this.prisma.quote.update({
+      where: {
+        id,
+      },
+      data: {
+        status,
+      },
+    });
+  }
+
+  async updateDiscount(id: string, discount: number) {
+    const quote = await this.prisma.quote.findUnique({
+      where: {
+        id,
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException("Quote not found");
+    }
+
+    if (discount < 0) {
+      throw new BadRequestException(
+        "Discount cannot be negative",
+      );
+    }
+
+    const subtotal = Number(quote.subtotal);
+
+    if (discount > subtotal) {
+      throw new BadRequestException(
+        "Discount cannot be greater than subtotal",
+      );
+    }
+
+    const total = subtotal - discount;
+
+    return this.prisma.quote.update({
+      where: {
+        id,
+      },
+      data: {
+        discount,
+        total,
+      },
+    });
   }
 
   async addItem(
