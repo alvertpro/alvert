@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -11,6 +12,7 @@ import { CreateQuoteDto } from "./dto/create-quote.dto.js";
 import { CreateQuoteItemDto } from "./dto/create-quote-item.dto.js";
 import { UpdateQuoteStatusDto } from "./dto/update-quote-status.dto.js";
 import { UpdateQuoteDiscountDto } from "./dto/update-quote-discount.dto.js";
+import { UpdateQuoteItemDto } from "./dto/update-quote-item.dto.js";
 
 @Controller("quotes")
 export class QuotesController {
@@ -46,6 +48,30 @@ export class QuotesController {
     @Body() dto: CreateQuoteItemDto,
   ) {
     return this.quotesService.addItem(id, dto);
+  }
+
+  @Patch(":quoteId/items/:itemId")
+  updateItem(
+    @Param("quoteId") quoteId: string,
+    @Param("itemId") itemId: string,
+    @Body() dto: UpdateQuoteItemDto,
+  ) {
+    return this.quotesService.updateItem(
+      quoteId,
+      itemId,
+      dto,
+    );
+  }
+
+  @Delete(":quoteId/items/:itemId")
+  removeItem(
+    @Param("quoteId") quoteId: string,
+    @Param("itemId") itemId: string,
+  ) {
+    return this.quotesService.removeItem(
+      quoteId,
+      itemId,
+    );
   }
 
   @Patch(":id/discount")
