@@ -9,6 +9,7 @@ import { AuthService } from "./auth.service.js";
   imports: [
     ConfigModule,
     JwtModule.registerAsync({
+      global: true,
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
@@ -21,6 +22,6 @@ import { AuthService } from "./auth.service.js";
   ],
   controllers: [AuthController],
   providers: [AuthService, AuthGuard],
-  exports: [AuthService],
+  exports: [AuthService, AuthGuard],
 })
 export class AuthModule {}
