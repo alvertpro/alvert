@@ -1,43 +1,31 @@
 import {
-  BadRequestException,  
+  BadRequestException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { PrismaService } from "../prisma/prisma.service.js";
-import { CreateQuoteDto } from "./dto/create-quote.dto.js";
-import { CreateQuoteItemDto } from "./dto/create-quote-item.dto.js";
 import type { QuoteStatus } from "../generated/enums.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { CreateQuoteItemDto } from "./dto/create-quote-item.dto.js";
+import { CreateQuoteDto } from "./dto/create-quote.dto.js";
 import { UpdateQuoteItemDto } from "./dto/update-quote-item.dto.js";
 
 @Injectable()
 export class QuotesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(dto: CreateQuoteDto) {
-    const company = await this.prisma.company.findUnique({
-      where: {
-        id: dto.companyId,
-      },
-    });
-
-    if (!company) {
-      throw new NotFoundException("Company not found");
-    }
-
-    const customer = await this.prisma.customer.findUnique({
+  async create(
+    companyId: string,
+    dto: CreateQuoteDto,
+  ) {
+    const customer = await this.prisma.customer.findFirst({
       where: {
         id: dto.customerId,
+        companyId,
       },
     });
 
     if (!customer) {
       throw new NotFoundException("Customer not found");
-    }
-
-    if (customer.companyId !== company.id) {
-      throw new NotFoundException(
-        "Customer does not belong to this company",
-      );
     }
 
     const quoteNumber = `TEK-${Date.now()}`;
@@ -46,7 +34,7 @@ export class QuotesService {
       data: {
         quoteNumber,
         title: dto.title,
-        companyId: dto.companyId,
+        companyId,
         customerId: dto.customerId,
         validUntil: dto.validUntil
           ? new Date(dto.validUntil)
@@ -55,10 +43,14 @@ export class QuotesService {
     });
   }
 
-  async findOne(id: string) {
-    const quote = await this.prisma.quote.findUnique({
+  async findOne(
+    companyId: string,
+    id: string,
+  ) {
+    const quote = await this.prisma.quote.findFirst({
       where: {
         id,
+        companyId,
       },
       include: {
         company: true,
@@ -74,8 +66,11 @@ export class QuotesService {
     return quote;
   }
 
-  async findAll() {
+  async findAll(companyId: string) {
     return this.prisma.quote.findMany({
+      where: {
+        companyId,
+      },
       include: {
         company: true,
         customer: true,
@@ -87,16 +82,12 @@ export class QuotesService {
     });
   }
 
-  async updateStatus(id: string, status: QuoteStatus) {
-    const quote = await this.prisma.quote.findUnique({
-      where: {
-        id,
-      },
-    });
-
-    if (!quote) {
-      throw new NotFoundException("Quote not found");
-    }
+  async updateStatus(
+    companyId: string,
+    id: string,
+    status: QuoteStatus,
+  ) {
+    await this.requireQuote(companyId, id);
 
     return this.prisma.quote.update({
       where: {
@@ -108,16 +99,15 @@ export class QuotesService {
     });
   }
 
-  async updateDiscount(id: string, discount: number) {
-    const quote = await this.prisma.quote.findUnique({
-      where: {
-        id,
-      },
-    });
-
-    if (!quote) {
-      throw new NotFoundException("Quote not found");
-    }
+  async updateDiscount(
+    companyId: string,
+    id: string,
+    discount: number,
+  ) {
+    const quote = await this.requireQuote(
+      companyId,
+      id,
+    );
 
     if (discount < 0) {
       throw new BadRequestException(
@@ -133,32 +123,23 @@ export class QuotesService {
       );
     }
 
-    const total = subtotal - discount;
-
     return this.prisma.quote.update({
       where: {
         id,
       },
       data: {
         discount,
-        total,
+        total: subtotal - discount,
       },
     });
   }
 
   async addItem(
+    companyId: string,
     quoteId: string,
     dto: CreateQuoteItemDto,
   ) {
-    const quote = await this.prisma.quote.findUnique({
-      where: {
-        id: quoteId,
-      },
-    });
-
-    if (!quote) {
-      throw new NotFoundException("Quote not found");
-    }
+    await this.requireQuote(companyId, quoteId);
 
     const quantity = dto.quantity;
     const unitPrice = dto.unitPrice;
@@ -175,16 +156,22 @@ export class QuotesService {
       },
     });
 
-    await this.recalculateQuote(quoteId);
+    await this.recalculateQuote(
+      companyId,
+      quoteId,
+    );
 
     return item;
   }
 
   async updateItem(
+    companyId: string,
     quoteId: string,
     itemId: string,
     dto: UpdateQuoteItemDto,
   ) {
+    await this.requireQuote(companyId, quoteId);
+
     const item = await this.prisma.quoteItem.findFirst({
       where: {
         id: itemId,
@@ -209,7 +196,8 @@ export class QuotesService {
         id: itemId,
       },
       data: {
-        description: dto.description ?? item.description,
+        description:
+          dto.description ?? item.description,
         quantity,
         unit: dto.unit ?? item.unit,
         unitPrice,
@@ -217,15 +205,21 @@ export class QuotesService {
       },
     });
 
-    await this.recalculateQuote(quoteId);
+    await this.recalculateQuote(
+      companyId,
+      quoteId,
+    );
 
     return updatedItem;
   }
 
   async removeItem(
+    companyId: string,
     quoteId: string,
     itemId: string,
   ) {
+    await this.requireQuote(companyId, quoteId);
+
     const item = await this.prisma.quoteItem.findFirst({
       where: {
         id: itemId,
@@ -243,7 +237,10 @@ export class QuotesService {
       },
     });
 
-    await this.recalculateQuote(quoteId);
+    await this.recalculateQuote(
+      companyId,
+      quoteId,
+    );
 
     return {
       deleted: true,
@@ -251,7 +248,33 @@ export class QuotesService {
     };
   }
 
-  private async recalculateQuote(quoteId: string) {
+  private async requireQuote(
+    companyId: string,
+    quoteId: string,
+  ) {
+    const quote = await this.prisma.quote.findFirst({
+      where: {
+        id: quoteId,
+        companyId,
+      },
+    });
+
+    if (!quote) {
+      throw new NotFoundException("Quote not found");
+    }
+
+    return quote;
+  }
+
+  private async recalculateQuote(
+    companyId: string,
+    quoteId: string,
+  ) {
+    const quote = await this.requireQuote(
+      companyId,
+      quoteId,
+    );
+
     const items = await this.prisma.quoteItem.findMany({
       where: {
         quoteId,
@@ -262,16 +285,6 @@ export class QuotesService {
       (sum, item) => sum + Number(item.total),
       0,
     );
-
-    const quote = await this.prisma.quote.findUnique({
-      where: {
-        id: quoteId,
-      },
-    });
-
-    if (!quote) {
-      throw new NotFoundException("Quote not found");
-    }
 
     const discount = Number(quote.discount);
     const total = subtotal - discount;

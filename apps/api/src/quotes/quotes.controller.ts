@@ -6,7 +6,11 @@ import {
   Param,
   Patch,
   Post,
+  Req,
+  UseGuards,
 } from "@nestjs/common";
+import type { Request } from "express";
+import { AuthGuard } from "../auth/auth.guard.js";
 import { QuotesService } from "./quotes.service.js";
 import { CreateQuoteDto } from "./dto/create-quote.dto.js";
 import { CreateQuoteItemDto } from "./dto/create-quote-item.dto.js";
@@ -14,6 +18,16 @@ import { UpdateQuoteStatusDto } from "./dto/update-quote-status.dto.js";
 import { UpdateQuoteDiscountDto } from "./dto/update-quote-discount.dto.js";
 import { UpdateQuoteItemDto } from "./dto/update-quote-item.dto.js";
 
+type AuthenticatedRequest = Request & {
+  user: {
+    sub: string;
+    email: string;
+    companyId: string;
+    role: string;
+  };
+};
+
+@UseGuards(AuthGuard)
 @Controller("quotes")
 export class QuotesController {
   constructor(
@@ -21,42 +35,69 @@ export class QuotesController {
   ) {}
 
   @Post()
-  create(@Body() dto: CreateQuoteDto) {
-    return this.quotesService.create(dto);
+  create(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: CreateQuoteDto,
+  ) {
+    return this.quotesService.create(
+      request.user.companyId,
+      dto,
+    );
   }
+
   @Get()
-  findAll() {
-    return this.quotesService.findAll();
+  findAll(@Req() request: AuthenticatedRequest) {
+    return this.quotesService.findAll(
+      request.user.companyId,
+    );
   }
 
   @Get(":id")
-  findOne(@Param("id") id: string) {
-    return this.quotesService.findOne(id);
+  findOne(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+  ) {
+    return this.quotesService.findOne(
+      request.user.companyId,
+      id,
+    );
   }
 
   @Patch(":id/status")
   updateStatus(
+    @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: UpdateQuoteStatusDto,
   ) {
-    return this.quotesService.updateStatus(id, dto.status);
+    return this.quotesService.updateStatus(
+      request.user.companyId,
+      id,
+      dto.status,
+    );
   }
 
   @Post(":id/items")
   addItem(
+    @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: CreateQuoteItemDto,
   ) {
-    return this.quotesService.addItem(id, dto);
+    return this.quotesService.addItem(
+      request.user.companyId,
+      id,
+      dto,
+    );
   }
 
   @Patch(":quoteId/items/:itemId")
   updateItem(
+    @Req() request: AuthenticatedRequest,
     @Param("quoteId") quoteId: string,
     @Param("itemId") itemId: string,
     @Body() dto: UpdateQuoteItemDto,
   ) {
     return this.quotesService.updateItem(
+      request.user.companyId,
       quoteId,
       itemId,
       dto,
@@ -65,10 +106,12 @@ export class QuotesController {
 
   @Delete(":quoteId/items/:itemId")
   removeItem(
+    @Req() request: AuthenticatedRequest,
     @Param("quoteId") quoteId: string,
     @Param("itemId") itemId: string,
   ) {
     return this.quotesService.removeItem(
+      request.user.companyId,
       quoteId,
       itemId,
     );
@@ -76,10 +119,12 @@ export class QuotesController {
 
   @Patch(":id/discount")
   updateDiscount(
+    @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
     @Body() dto: UpdateQuoteDiscountDto,
   ) {
     return this.quotesService.updateDiscount(
+      request.user.companyId,
       id,
       dto.discount,
     );
