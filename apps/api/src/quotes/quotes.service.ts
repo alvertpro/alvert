@@ -8,6 +8,7 @@ import { PrismaService } from "../prisma/prisma.service.js";
 import { CreateQuoteItemDto } from "./dto/create-quote-item.dto.js";
 import { CreateQuoteDto } from "./dto/create-quote.dto.js";
 import { UpdateQuoteItemDto } from "./dto/update-quote-item.dto.js";
+import { UpdateQuoteDto } from "./dto/update-quote.dto.js";
 
 @Injectable()
 export class QuotesService {
@@ -99,7 +100,59 @@ export class QuotesService {
     });
   }
 
-  async updateDiscount(
+  async update(
+    companyId: string,
+    id: string,
+    dto: UpdateQuoteDto,
+  ) {
+    const quote = await this.requireQuote(companyId, id);
+
+    if (dto.customerId) {
+      const customer = await this.prisma.customer.findFirst({
+        where: {
+          id: dto.customerId,
+          companyId,
+        },
+      });
+
+      if (!customer) {
+        throw new NotFoundException("Customer not found");
+      }
+    }
+
+    return this.prisma.quote.update({
+      where: {
+        id: quote.id,
+      },
+      data: {
+        title: dto.title,
+        customerId: dto.customerId,
+        validUntil: dto.validUntil
+          ? new Date(dto.validUntil)
+          : undefined,
+      },
+    });
+  }
+
+  async remove(
+    companyId: string,
+    id: string,
+  ) {
+    await this.requireQuote(companyId, id);
+
+    await this.prisma.quote.delete({
+      where: {
+        id,
+      },
+    });
+
+    return {
+      deleted: true,
+      quoteId: id,
+    };
+  } 
+
+ async updateDiscount(
     companyId: string,
     id: string,
     discount: number,

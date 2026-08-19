@@ -17,6 +17,7 @@ import { CreateQuoteItemDto } from "./dto/create-quote-item.dto.js";
 import { UpdateQuoteStatusDto } from "./dto/update-quote-status.dto.js";
 import { UpdateQuoteDiscountDto } from "./dto/update-quote-discount.dto.js";
 import { UpdateQuoteItemDto } from "./dto/update-quote-item.dto.js";
+import { UpdateQuoteDto } from "./dto/update-quote.dto.js";
 
 type AuthenticatedRequest = Request & {
   user: {
@@ -46,7 +47,9 @@ export class QuotesController {
   }
 
   @Get()
-  findAll(@Req() request: AuthenticatedRequest) {
+  findAll(
+    @Req() request: AuthenticatedRequest,
+  ) {
     return this.quotesService.findAll(
       request.user.companyId,
     );
@@ -58,6 +61,30 @@ export class QuotesController {
     @Param("id") id: string,
   ) {
     return this.quotesService.findOne(
+      request.user.companyId,
+      id,
+    );
+  }
+
+  @Patch(":id")
+  update(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Body() dto: UpdateQuoteDto,
+  ) {
+    return this.quotesService.update(
+      request.user.companyId,
+      id,
+      dto,
+    );
+  }
+
+  @Delete(":id")
+  remove(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+  ) {
+    return this.quotesService.remove(
       request.user.companyId,
       id,
     );
