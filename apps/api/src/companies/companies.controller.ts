@@ -1,24 +1,53 @@
-import { Body, Controller, Get, Param, Post } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import type { Request } from "express";
+import { AuthGuard } from "../auth/auth.guard.js";
+import { Roles } from "../auth/roles.decorator.js";
+import { RolesGuard } from "../auth/roles.guard.js";
+import { UserRole } from "../generated/enums.js";
 import { CompaniesService } from "./companies.service.js";
+import { UpdateCompanyDto } from "./dto/update-company.dto.js";
 
+type AuthenticatedRequest = Request & {
+  user: {
+    sub: string;
+    email: string;
+    companyId: string;
+    role: UserRole;
+  };
+};
+
+@UseGuards(AuthGuard, RolesGuard)
+@Roles(UserRole.OWNER, UserRole.ADMIN)
 @Controller("companies")
 export class CompaniesController {
-  constructor(private readonly companiesService: CompaniesService) {}
+  constructor(
+    private readonly companiesService: CompaniesService,
+  ) {}
 
-  @Post()
-  async create(
-    @Body()
-    body: {
-      name: string;
-      email?: string;
-      phone?: string;
-    },
+  @Get("me")
+  findMyCompany(
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.companiesService.create(body);
+    return this.companiesService.findById(
+      request.user.companyId,
+    );
   }
 
-  @Get(":id")
-  async findById(@Param("id") id: string) {
-    return this.companiesService.findById(id);
+  @Patch("me")
+  updateMyCompany(
+    @Req() request: AuthenticatedRequest,
+    @Body() dto: UpdateCompanyDto,
+  ) {
+    return this.companiesService.update(
+      request.user.companyId,
+      dto,
+    );
   }
 }
