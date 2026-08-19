@@ -4,7 +4,9 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import * as bcrypt from "bcrypt";
+import { UserRole } from "../generated/enums.js";
 import { PrismaService } from "../prisma/prisma.service.js";
+import { CreateTeamMemberDto } from "./dto/create-team-member.dto.js";
 import { RegisterUserDto } from "./dto/register-user.dto.js";
 
 @Injectable()
@@ -49,6 +51,68 @@ export class UsersService {
         companyId: true,
         createdAt: true,
         updatedAt: true,
+      },
+    });
+  }
+
+  async createTeamMember(
+    companyId: string,
+    dto: CreateTeamMemberDto,
+  ) {
+    if (dto.role === UserRole.OWNER) {
+      throw new BadRequestException(
+        "Cannot create another OWNER",
+      );
+    }
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: {
+        email: dto.email,
+      },
+    });
+
+    if (existingUser) {
+      throw new BadRequestException("Email already in use");
+    }
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+
+    return this.prisma.user.create({
+      data: {
+        email: dto.email,
+        name: dto.name,
+        password: passwordHash,
+        role: dto.role,
+        companyId,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        companyId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  async findAllByCompany(companyId: string) {
+    return this.prisma.user.findMany({
+      where: {
+        companyId,
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+        companyId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: {
+        createdAt: "asc",
       },
     });
   }
