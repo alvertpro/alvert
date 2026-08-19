@@ -1,8 +1,10 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -10,6 +12,7 @@ import {
 import type { Request } from "express";
 import { AuthGuard } from "../auth/auth.guard.js";
 import { CreateCustomerDto } from "./dto/create-customer.dto.js";
+import { UpdateCustomerDto } from "./dto/update-customer.dto.js";
 import { CustomersService } from "./customers.service.js";
 
 type AuthenticatedRequest = Request & {
@@ -37,12 +40,45 @@ export class CustomersController {
     );
   }
 
+  @Get()
+  findAll(
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.customersService.findAll(
+      request.user.companyId,
+    );
+  }
+
   @Get(":id")
   findOne(
     @Req() request: AuthenticatedRequest,
     @Param("id") id: string,
   ) {
     return this.customersService.findOne(
+      request.user.companyId,
+      id,
+    );
+  }
+
+  @Patch(":id")
+  update(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+    @Body() dto: UpdateCustomerDto,
+  ) {
+    return this.customersService.update(
+      request.user.companyId,
+      id,
+      dto,
+    );
+  }
+
+  @Delete(":id")
+  remove(
+    @Req() request: AuthenticatedRequest,
+    @Param("id") id: string,
+  ) {
+    return this.customersService.remove(
       request.user.companyId,
       id,
     );
