@@ -384,7 +384,8 @@ export class QuotesService {
       0,
     );
 
-    const discount = Number(quote.discount);
+    const currentDiscount = Number(quote.discount);
+    const discount = Math.min(currentDiscount, subtotal);
     const total = subtotal - discount;
 
     await this.prisma.quote.update({
@@ -393,6 +394,7 @@ export class QuotesService {
       },
       data: {
         subtotal,
+        discount,
         total,
       },
     });
