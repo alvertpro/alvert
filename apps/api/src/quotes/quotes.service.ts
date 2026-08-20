@@ -14,6 +14,20 @@ import { UpdateQuoteDto } from "./dto/update-quote.dto.js";
 export class QuotesService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private validateValidUntil(validUntil?: string) {
+    if (!validUntil) {
+      return;
+    }
+
+    const date = new Date(validUntil);
+
+    if (date.getTime() <= Date.now()) {
+      throw new BadRequestException(
+        "validUntil must be in the future",
+      );
+    }
+  }
+
   async create(
     companyId: string,
     dto: CreateQuoteDto,
@@ -28,6 +42,8 @@ export class QuotesService {
     if (!customer) {
       throw new NotFoundException("Customer not found");
     }
+
+    this.validateValidUntil(dto.validUntil);
 
     const quoteNumber = `TEK-${Date.now()}`;
 
@@ -88,7 +104,34 @@ export class QuotesService {
     id: string,
     status: QuoteStatus,
   ) {
-    await this.requireQuote(companyId, id);
+    const quote = await this.requireQuote(companyId, id);
+
+    const allowedTransitions: Record<
+      QuoteStatus,
+      QuoteStatus[]
+    > = {
+      DRAFT: ["SENT"],
+      SENT: [
+        "VIEWED",
+        "ACCEPTED",
+        "REJECTED",
+        "EXPIRED",
+      ],
+      VIEWED: [
+        "ACCEPTED",
+        "REJECTED",
+        "EXPIRED",
+      ],
+      ACCEPTED: [],
+      REJECTED: [],
+      EXPIRED: [],
+    };
+
+    if (!allowedTransitions[quote.status].includes(status)) {
+      throw new BadRequestException(
+        `Cannot change quote status from ${quote.status} to ${status}`,
+      );
+    }
 
     return this.prisma.quote.update({
       where: {
@@ -120,6 +163,8 @@ export class QuotesService {
       }
     }
 
+    this.validateValidUntil(dto.validUntil);
+
     return this.prisma.quote.update({
       where: {
         id: quote.id,
@@ -150,9 +195,9 @@ export class QuotesService {
       deleted: true,
       quoteId: id,
     };
-  } 
+  }
 
- async updateDiscount(
+  async updateDiscount(
     companyId: string,
     id: string,
     discount: number,
